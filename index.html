@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+}
+
+
+function Chatbot(){
+const [messages,setMessages]=React.useState([{id:'m0',role:'assistant',content:`Welcome to DJ Berto! Ask me about DJ packages, availability, or booking.`,meta:null}]);
+const [input,setInput] = React.useState('');
+const [isTyping,setIsTyping]=React.useState(false);
+const [dark,setDark]=React.useState(false);
+const scrollRef = React.useRef(null);
+
+
+const send = async (text)=>{
+if(!text.trim()) return;
+const userMsg={id:crypto.randomUUID(),role:'user',content:text,meta:null};
+setMessages(m=>[...m,userMsg]);
+setInput('');
+setIsTyping(true);
+const reply = await generateReply(text);
+setIsTyping(false);
+const botMsg={id:crypto.randomUUID(),role:'assistant',content:reply,meta:typeof reply==='object'?{kind:reply.type,payload:reply}:null};
+setMessages(m=>[...m,botMsg]);
+};
+
+
+const onQuickPick=(q)=>send(q);
+React.useEffect(()=>{scrollRef.current?.scrollTo({top:scrollRef.current.scrollHeight,behavior:'smooth'});},[messages,isTyping]);
+
+
+const onSubmitLead=(data)=>{
+const summary=`Thanks, ${data.fullName||'friend'}! We received your request for ${data.eventType||'your event'} on ${data.date} from ${data.startTime} to ${data.endTime} in ${data.venueCity}. I’ll confirm availability and send a quote.`;
+setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',content:summary,meta:null}]);
+};
+
+
+return React.createElement('div',{className:`min-h-[60vh] w-full flex items-center justify-center ${dark?'bg-gray-900':'bg-gray-50'}`},
+React.createElement('div',{className:'w-full max-w-2xl mx-auto rounded-3xl border shadow-xl overflow-hidden bg-white'},
+React.createElement('div',{className:'flex items-center justify-between p-4 border-b',style:{background:dark?'#0f172a':'#f8fafc'}},
+React.createElement('div',{className:'flex items-center gap-3'},
+React.createElement('div',{className:'h-10 w-10 rounded-xl flex items-center justify-center text-white font-black',style:{background:BUSINESS.brandColor}},'B'),
+React.createElement('div',{},
+React.createElement('div',{className:`font-semibold ${dark?'text-white':'text-gray-900'}`},`${BUSINESS.name} — Assistant`),
+React.createElement('div',{className:`text-xs ${dark?'text-gray-300':'text-gray-500'}`},'Ask anything. Human handoff available.')
+)
+),
+React.createElement('div',{className:'flex items-center gap-2'},
+React.createElement('a',{href:BUSINESS.channels.instagram,target:'_blank',className:'text-xs underline'},'Instagram'),
+React.createElement('a',{href:BUSINESS.channels.whatsapp,target:'_blank',className:'text-xs underline'},'WhatsApp'),
+React.createElement('a',{href:BUSINESS.channels.facebook,target:'_blank',className:'text-xs underline'},'Facebook'),
+React.createElement('button',{onClick:()=>setDark(d=>!d),className:'ml-2 text-xs px-3 py-1 rounded-full border'},dark?'Light':'Dark')
+)
+)
+,
+React.createElement('div',{ref:scrollRef,className:`h-[60vh] overflow-y-auto p-4 space-y-4 ${dark?'bg-gray-950':'bg-white'}`},
+React.createElement(Bubble,{side:'left'},
+React.createElement('div',{className:'space-y-2'},
+React.createElement('div',{className:'font-medium'},'Quick actions'),
+React.createElement(QuickActions,{onPick:onQuickPick})
+)
+),
+...messages.map(m=>React.createElement('div',{key:m.id},
+m.role==='assistant'
+? React.createElement(Bubble,{side:'left'}, m.meta?.kind==='lead_capture'
+? React.createElement(LeadCaptureCard,{schema:m.meta.payload,onSubmit:onSubmitLead})
+: React.createElement('div',{className:'whitespace-pre-wrap'},String(m.content))
+)
+: React.createElement(Bubble,{side:'right'}, React.createElement('div',{className:'whitespace-pre-wrap'},m.content))
+)),
+isTyping && React.createElement('div',{}, React.createElement(Bubble,{side:'left'}, React.createElement('div',{className:'flex items-center gap-3'},React.createElement('span',null,'Typing'), React.createElement(TypingDots))))
+),
+React.createElement('form',{onSubmit:(e)=>{e.preventDefault();send(document.getElementById('dj-input').value);},className:`flex items-center gap-2 p-3 border-t ${dark?'bg-gray-950':'bg-gray-50'}`},
+React.createElement('input',{id:'dj-input',placeholder:'Type your message…',className:`flex-1 rounded-2xl px-4 py-3 border outline-none ${dark?'bg-gray-900 text-white border-gray-800':'bg-white border-gray-200'}`,onChange:e=>{},}),
+React.createElement('button',{type:'submit',className:'px-4 py-3 rounded-2xl text-white font-medium',style:{background:BUSINESS.brandColor}},'Send')
+)
+)
+);
+}
+
+
+// Mounting logic for the floating widget
+const toggleBtn = document.getElementById('dj-berto-chatbot-toggle');
+const panel = document.getElementById('dj-berto-chatbot-panel');
+let isOpen = false;
+
+
+const openWidget = ()=>{
+panel.classList.remove('hidden');
+if(!panel.__mounted){
+const root = ReactDOM.createRoot(panel);
+root.render(React.createElement(Chatbot));
+panel.__mounted = true;
+}
+isOpen = true;
+};
+const closeWidget = ()=>{ panel.classList.add('hidden'); isOpen=false; };
+
+
+toggleBtn.addEventListener('click', ()=>{ isOpen ? closeWidget() : openWidget(); });
+</script>
+</body>
+</html>
