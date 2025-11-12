@@ -1,101 +1,285 @@
 <!DOCTYPE html>
-}
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DJ Berto — Chatbot Widget</title>
+  <!-- Tailwind CDN (for quick embed) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Floating widget container */
+    #dj-berto-chatbot-widget{position:fixed;inset:auto 16px 16px auto;z-index:999999;}
+    #dj-berto-chatbot-panel{width:380px;max-width:92vw;height:70vh;max-height:80vh;}
+    @media (max-width: 480px){#dj-berto-chatbot-panel{height:80vh;width:96vw}}
+  </style>
+</head>
+<body class="bg-gray-50">
+  <!-- Floating Widget Root -->
+  <div id="dj-berto-chatbot-widget" class="flex flex-col items-end gap-3">
+    <div id="dj-berto-chatbot-panel" class="hidden rounded-2xl overflow-hidden shadow-2xl border border-gray-200 bg-white"></div>
+    <button id="dj-berto-chatbot-toggle" class="rounded-full shadow-xl px-4 py-3 text-white font-semibold flex items-center gap-2" style="background:#0b3aa0">
+      <span>Chat • DJ Berto</span>
+    </button>
+  </div>
 
+  <!-- React & ReactDOM -->
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-function Chatbot(){
-const [messages,setMessages]=React.useState([{id:'m0',role:'assistant',content:`Welcome to DJ Berto! Ask me about DJ packages, availability, or booking.`,meta:null}]);
-const [input,setInput] = React.useState('');
-const [isTyping,setIsTyping]=React.useState(false);
-const [dark,setDark]=React.useState(false);
-const scrollRef = React.useRef(null);
+  <!-- Chatbot Component (inline, single-file) -->
+  <script type="module">
+    const { useEffect, useRef, useState } = React;
 
+    const BUSINESS = {
+      name: "DJ Berto",
+      brandColor: "#0b3aa0",
+      accentColor: "#d4af37",
+      timezone: "America/New_York",
+      channels: {
+    whatsapp: "https://wa.me/16145550123?text=Hi%20DJ%20Berto%2C%20I%27d%20like%20to%20book%20you...",
+    instagram: "https://instagram.com/dj__berto",
+    facebook: "https://www.facebook.com/Proff.Apolog3tics",
+    bookingForm: "https://forms.gle/your-public-intake-form"
+  }
+    };
 
-const send = async (text)=>{
-if(!text.trim()) return;
-const userMsg={id:crypto.randomUUID(),role:'user',content:text,meta:null};
-setMessages(m=>[...m,userMsg]);
-setInput('');
-setIsTyping(true);
-const reply = await generateReply(text);
-setIsTyping(false);
-const botMsg={id:crypto.randomUUID(),role:'assistant',content:reply,meta:typeof reply==='object'?{kind:reply.type,payload:reply}:null};
-setMessages(m=>[...m,botMsg]);
-};
+    const QUICK_ACTIONS = [
+      "DJ packages","Availability","Pricing","Travel fees","Deposit & refunds","Power & setup","Timeline & MC","Song requests"
+    ];
 
+    const KNOWLEDGE_BASE = [
+      { id:"greeting", keywords:["hi","hello","hey","bonjour","salut","good morning","good evening"],
+        reply:()=>`Hey! I'm the ${BUSINESS.name} assistant. I can help with packages, availability, travel, deposits, power/setup, timeline & MC, and song requests. What do you need?`},
+      { id:"dj_packages", keywords:["dj","packages","dj packages","sound","lights","mc","host","music"],
+        reply:()=>"DJ Berto packages:\n• Essentials — $150/hr (2‑hr min): pro sound, curated playlist.\n• Party Plus — $200/hr: sound + dynamic lights, basic MC.\n• Premium Wedding — from $1,200: ceremony + cocktail + reception, full MC, custom intros, timeline support.\nAdd‑ons: wireless mics, uplighting, fog/haze (venue‑permitting), projector. Genres: Afrobeats, Amapiano, Makossa, Bikutsi, Zouk, Hip‑Hop, Top 40. Want availability for your date?"},
+      { id:"availability", keywords:["availability","are you free","date","calendar","book"],
+        reply:()=>"We usually book 2–4 weeks out. Share your date, venue city, start/end time, guest count, and vibe. I’ll confirm availability and hold your date with a deposit."},
+      { id:"pricing", keywords:["price","pricing","cost","how much","fee","rate"],
+        reply:()=>"Hourly from $150 (2‑hr min). Weddings from $1,200 full‑day coverage. Travel, add‑ons, and extended hours are extra. Tell me your event details for an exact quote."},
+      { id:"travel_fees", keywords:["travel","distance","mileage","columbus","ohio"], reply:()=>"Based in Columbus, OH. First 15 miles free; then $1.00/mile round‑trip. Late‑night or long‑distance may require lodging."},
+      { id:"power_requirements", keywords:["power","outlet","electric","generator","setup"], reply:()=>"Power: 2 separate 15A circuits within 50ft for premium rigs. Outdoors: quiet inverter generator available as an add‑on. We’ll confirm at booking."},
+      { id:"timeline_mc", keywords:["timeline","mc","emcee","announcements","intros","program"], reply:()=>"I can MC your event: grand entrances, announcements, toasts, games. We’ll build a simple timeline during a quick planning call the week of your event."},
+      { id:"song_requests", keywords:["song","requests","do not play","playlist","first dance","special songs"], reply:()=>"You’ll get a shared list for Must‑Plays and Do‑Not‑Plays. I handle live requests if approved. For weddings: upload first‑dance, parent dances, ceremony songs in advance."},
+      { id:"equipment", keywords:["equipment","gear","speakers","sub","lights","wireless mic"], reply:()=>"Pro audio (2‑4 tops + optional sub), wireless handheld/lapel mics, dance‑floor lighting, optional uplighting and projector. Clean, minimal footprint; backup gear on site."},
+      { id:"deposit_refunds", keywords:["deposit","refund","cancel","reschedule","policy"], reply:()=>"A non‑refundable 25% deposit holds your date. Balance due 48 hours before your event. Reschedules allowed (subject to availability) with at least 7 days’ notice."},
+      { id:"hours", keywords:["hours","open","closing","schedule"], reply:()=>`Inquiry hours: Mon–Fri 9:00 AM – 6:00 PM; Sat 10:00 AM – 2:00 PM. Gigs are booked any day by appointment.`},
+      { id:"location", keywords:["where are you","address","location","nearby","columbus"], reply:()=>"Based in Columbus, OH; travel throughout Central Ohio and beyond. Venue address collected at booking."},
+      { id:"contact", keywords:["contact","phone","email","message","reach"], reply:()=>`Reach out on WhatsApp (${BUSINESS.channels.whatsapp}), Instagram DMs, or use the booking form. What’s your preferred channel?`},
+      { id:"booking", keywords:["book","booking","reserve","appointment","schedule"], reply:()=>({
+          type:"lead_capture",
+          title:"Book DJ Berto",
+          fields:[
+            { name:"fullName", label:"Full name", type:"text", required:true },
+            { name:"email", label:"Email", type:"email", required:true },
+            { name:"phone", label:"Phone", type:"text", required:true },
+            { name:"eventType", label:"Event type", type:"select", required:true, options:["Wedding","Birthday","Corporate","Club/Bar","Graduation","Other"] },
+            { name:"date", label:"Event date", type:"date", required:true },
+            { name:"startTime", label:"Start time", type:"time", required:true },
+            { name:"endTime", label:"End time", type:"time", required:true },
+            { name:"venueCity", label:"Venue city", type:"text", required:true },
+            { name:"guestCount", label:"Guest count (approx)", type:"text" },
+            { name:"genres", label:"Vibe / genres (e.g., Afrobeats, Amapiano)", type:"text" },
+            { name:"budget", label:"Estimated budget (optional)", type:"text" },
+            { name:"notes", label:"Notes (special songs, uplights, etc.)", type:"textarea" }
+          ],
+          cta:"Request quote"
+        })
+      },
+      { id:"fallback", keywords:[], reply:({text})=>`I didn't find that in my knowledge yet. You asked: "${text}". Want me to take your details and have a human follow up?`}
+    ];
 
-const onQuickPick=(q)=>send(q);
-React.useEffect(()=>{scrollRef.current?.scrollTo({top:scrollRef.current.scrollHeight,behavior:'smooth'});},[messages,isTyping]);
+    const WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxYOUR_DEPLOYMENT_ID/exec";
+    const EMAIL_FALLBACK = "shungmoh@outlook.com";
 
+    const sleep = (ms) => new Promise(r=>setTimeout(r,ms));
+// Safe unique IDs
+const uid = () => (crypto?.randomUUID?.() || ('id-' + Math.random().toString(36).slice(2) + Date.now().toString(36)));
+    function classifyIntent(userText){
+      const text = userText.toLowerCase();
+      for(const item of KNOWLEDGE_BASE){
+        if(item.id==="fallback") continue;
+        if(item.keywords.some(k=>text.includes(k))) return item;
+      }
+      return KNOWLEDGE_BASE.find(x=>x.id==="fallback");
+    }
+    async function generateReply(userText){
+      const intent = classifyIntent(userText);
+      const out = typeof intent.reply === "function" ? intent.reply({ text: userText }) : intent.reply;
+      await sleep(300);
+      return out;
+    }
 
-const onSubmitLead=(data)=>{
-const summary=`Thanks, ${data.fullName||'friend'}! We received your request for ${data.eventType||'your event'} on ${data.date} from ${data.startTime} to ${data.endTime} in ${data.venueCity}. I’ll confirm availability and send a quote.`;
-setMessages(m=>[...m,{id:crypto.randomUUID(),role:'assistant',content:summary,meta:null}]);
-};
+    function BotAvatar(){
+      return React.createElement('div',{className:'h-8 w-8 rounded-full flex items-center justify-center font-bold text-white',style:{background:BUSINESS.brandColor}},'B');
+    }
+    function UserAvatar(){
+      return React.createElement('div',{className:'h-8 w-8 rounded-full bg-gray-700 text-white flex items-center justify-center font-bold'},'U');
+    }
+    function Bubble({side='left',children}){
+      const align = side==='left'? 'items-start':'items-end';
+      const base = 'max-w-[85%] rounded-2xl px-4 py-2 text-sm leading-relaxed shadow-sm border';
+      const left = 'bg-white border-gray-200 text-gray-900';
+      const right = 'bg-gray-900 text-white border-gray-800';
+      return React.createElement('div',{className:`w-full flex ${align} gap-2`},
+        side==='left' && React.createElement(BotAvatar),
+        React.createElement('div',{className:`${base} ${side==='left'?left:right}`},children),
+        side==='right' && React.createElement(UserAvatar)
+      );
+    }
 
+    function TypingDots(){
+      return React.createElement('div',{className:'flex gap-1 items-center mt-1'},
+        React.createElement('span',{className:'w-2 h-2 rounded-full bg-gray-400 animate-bounce',style:{animationDelay:'0ms'}}),
+        React.createElement('span',{className:'w-2 h-2 rounded-full bg-gray-400 animate-bounce',style:{animationDelay:'150ms'}}),
+        React.createElement('span',{className:'w-2 h-2 rounded-full bg-gray-400 animate-bounce',style:{animationDelay:'300ms'}})
+      );
+    }
 
-return React.createElement('div',{className:`min-h-[60vh] w-full flex items-center justify-center ${dark?'bg-gray-900':'bg-gray-50'}`},
-React.createElement('div',{className:'w-full max-w-2xl mx-auto rounded-3xl border shadow-xl overflow-hidden bg-white'},
-React.createElement('div',{className:'flex items-center justify-between p-4 border-b',style:{background:dark?'#0f172a':'#f8fafc'}},
-React.createElement('div',{className:'flex items-center gap-3'},
-React.createElement('div',{className:'h-10 w-10 rounded-xl flex items-center justify-center text-white font-black',style:{background:BUSINESS.brandColor}},'B'),
-React.createElement('div',{},
-React.createElement('div',{className:`font-semibold ${dark?'text-white':'text-gray-900'}`},`${BUSINESS.name} — Assistant`),
-React.createElement('div',{className:`text-xs ${dark?'text-gray-300':'text-gray-500'}`},'Ask anything. Human handoff available.')
-)
-),
-React.createElement('div',{className:'flex items-center gap-2'},
-React.createElement('a',{href:BUSINESS.channels.instagram,target:'_blank',className:'text-xs underline'},'Instagram'),
-React.createElement('a',{href:BUSINESS.channels.whatsapp,target:'_blank',className:'text-xs underline'},'WhatsApp'),
-React.createElement('a',{href:BUSINESS.channels.facebook,target:'_blank',className:'text-xs underline'},'Facebook'),
-React.createElement('button',{onClick:()=>setDark(d=>!d),className:'ml-2 text-xs px-3 py-1 rounded-full border'},dark?'Light':'Dark')
-)
-)
-,
-React.createElement('div',{ref:scrollRef,className:`h-[60vh] overflow-y-auto p-4 space-y-4 ${dark?'bg-gray-950':'bg-white'}`},
-React.createElement(Bubble,{side:'left'},
-React.createElement('div',{className:'space-y-2'},
-React.createElement('div',{className:'font-medium'},'Quick actions'),
-React.createElement(QuickActions,{onPick:onQuickPick})
-)
-),
-...messages.map(m=>React.createElement('div',{key:m.id},
-m.role==='assistant'
-? React.createElement(Bubble,{side:'left'}, m.meta?.kind==='lead_capture'
-? React.createElement(LeadCaptureCard,{schema:m.meta.payload,onSubmit:onSubmitLead})
-: React.createElement('div',{className:'whitespace-pre-wrap'},String(m.content))
-)
-: React.createElement(Bubble,{side:'right'}, React.createElement('div',{className:'whitespace-pre-wrap'},m.content))
-)),
-isTyping && React.createElement('div',{}, React.createElement(Bubble,{side:'left'}, React.createElement('div',{className:'flex items-center gap-3'},React.createElement('span',null,'Typing'), React.createElement(TypingDots))))
-),
-React.createElement('form',{onSubmit:(e)=>{e.preventDefault();send(document.getElementById('dj-input').value);},className:`flex items-center gap-2 p-3 border-t ${dark?'bg-gray-950':'bg-gray-50'}`},
-React.createElement('input',{id:'dj-input',placeholder:'Type your message…',className:`flex-1 rounded-2xl px-4 py-3 border outline-none ${dark?'bg-gray-900 text-white border-gray-800':'bg-white border-gray-200'}`,onChange:e=>{},}),
-React.createElement('button',{type:'submit',className:'px-4 py-3 rounded-2xl text-white font-medium',style:{background:BUSINESS.brandColor}},'Send')
-)
-)
-);
-}
+    function QuickActions({onPick}){
+      return React.createElement('div',{className:'flex flex-wrap gap-2'},
+        ...QUICK_ACTIONS.map(q=>React.createElement('button',{
+          key:q,onClick:()=>onPick(q),className:'px-3 py-1.5 rounded-full border text-sm hover:shadow-sm transition'
+        },q))
+      );
+    }
 
+    function LeadCaptureCard({schema,onSubmit}){
+      const [form,setForm] = React.useState(()=>Object.fromEntries(schema.fields.map(f=>[f.name,''])));
+      const [submitting,setSubmitting] = React.useState(false);
+      const update=(n,v)=>setForm(s=>({...s,[n]:v}));
+      const submit=async(e)=>{e.preventDefault();setSubmitting(true);
+        // Webhook to Google Sheet
+        let delivered=false;
+        try{
+          if(WEBHOOK_URL && WEBHOOK_URL.startsWith('http')){
+            const res = await fetch(WEBHOOK_URL,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source:'dj-berto-chatbot',timestamp:Date.now(),...form})});
+            delivered = res.ok;
+          }
+        }catch(_){ delivered=false; }
+        if(!delivered && EMAIL_FALLBACK){
+          const subject=encodeURIComponent('New DJ Berto booking request');
+          const body=encodeURIComponent(`Name: ${form.fullName}\nEmail: ${form.email}\nPhone: ${form.phone}\nEvent: ${form.eventType}\nDate: ${form.date} ${form.startTime}-${form.endTime}\nCity: ${form.venueCity}\nGuests: ${form.guestCount||''}\nGenres: ${form.genres||''}\nBudget: ${form.budget||''}\nNotes: ${form.notes||''}`);
+          window.open(`mailto:${EMAIL_FALLBACK}?subject=${subject}&body=${body}`,"_blank");
+        }
+        setSubmitting(false);
+        onSubmit(form);
+      };
+      return React.createElement('form',{onSubmit:submit,className:'w-full bg-white border rounded-2xl p-4 shadow-sm'},
+        React.createElement('h4',{className:'font-semibold text-gray-900 mb-3'},schema.title),
+        React.createElement('div',{className:'grid grid-cols-1 sm:grid-cols-2 gap-3'},
+          ...schema.fields.map(f=>React.createElement('div',{key:f.name,className:f.type==='textarea'?'sm:col-span-2':''},
+            React.createElement('label',{className:'block text-xs font-medium text-gray-600 mb-1'},`${f.label}${f.required?' *':''}`),
+            f.type==='select'
+              ? React.createElement('select',{className:'w-full border rounded-xl px-3 py-2',required:f.required,value:form[f.name],onChange:e=>update(f.name,e.target.value)},
+                  React.createElement('option',{value:''},'Select...'),
+                  ...f.options.map(opt=>React.createElement('option',{key:opt,value:opt},opt))
+                )
+              : f.type==='textarea'
+              ? React.createElement('textarea',{className:'w-full border rounded-xl px-3 py-2 min-h-[90px]',required:f.required,value:form[f.name],onChange:e=>update(f.name,e.target.value)})
+              : React.createElement('input',{className:'w-full border rounded-xl px-3 py-2',type:f.type||'text',required:f.required,value:form[f.name],onChange:e=>update(f.name,e.target.value)})
+          ))
+        ),
+        React.createElement('div',{className:'flex items-center gap-3 mt-4'},
+          React.createElement('button',{type:'submit',disabled:submitting,className:'px-4 py-2 rounded-xl text-white',style:{background:BUSINESS.brandColor}}, submitting?'Submitting…':(schema.cta||'Submit')),
+          React.createElement('a',{href:BUSINESS.channels.bookingForm,target:'_blank',className:'text-sm underline'},'Use external form')
+        )
+      );
+    }
 
-// Mounting logic for the floating widget
-const toggleBtn = document.getElementById('dj-berto-chatbot-toggle');
-const panel = document.getElementById('dj-berto-chatbot-panel');
-let isOpen = false;
+    function Chatbot(){
+      const [messages,setMessages]=React.useState([{id:'m0',role:'assistant',content:`Welcome to DJ Berto! Ask me about DJ packages, availability, or booking.`,meta:null}]);
+      const [input,setInput] = React.useState('');
+      const [isTyping,setIsTyping]=React.useState(false);
+      const [dark,setDark]=React.useState(false);
+      const scrollRef = React.useRef(null);
 
+      const send = async (text)=>{
+        if(!text.trim()) return;
+        const userMsg={id:uid(),role:'user',content:text,meta:null};
+        setMessages(m=>[...m,userMsg]);
+        setInput('');
+        setIsTyping(true);
+        const reply = await generateReply(text);
+        setIsTyping(false);
+        const botMsg={id:uid(),role:'assistant',content:reply,meta:typeof reply==='object'?{kind:reply.type,payload:reply}:null};
+        setMessages(m=>[...m,botMsg]);
+      };
 
-const openWidget = ()=>{
-panel.classList.remove('hidden');
-if(!panel.__mounted){
-const root = ReactDOM.createRoot(panel);
-root.render(React.createElement(Chatbot));
-panel.__mounted = true;
-}
-isOpen = true;
-};
-const closeWidget = ()=>{ panel.classList.add('hidden'); isOpen=false; };
+      const onQuickPick=(q)=>send(q);
+      React.useEffect(()=>{scrollRef.current?.scrollTo({top:scrollRef.current.scrollHeight,behavior:'smooth'});},[messages,isTyping]);
 
+      const onSubmitLead=(data)=>{
+        const summary=`Thanks, ${data.fullName||'friend'}! We received your request for ${data.eventType||'your event'} on ${data.date} from ${data.startTime} to ${data.endTime} in ${data.venueCity}. I’ll confirm availability and send a quote.`;
+        setMessages(m=>[...m,{id:uid(),role:'assistant',content:summary,meta:null}]);
+      };
 
-toggleBtn.addEventListener('click', ()=>{ isOpen ? closeWidget() : openWidget(); });
-</script>
+      return React.createElement('div',{className:`min-h-[60vh] w-full flex items-center justify-center ${dark?'bg-gray-900':'bg-gray-50'}`},
+        React.createElement('div',{className:'w-full max-w-2xl mx-auto rounded-3xl border shadow-xl overflow-hidden bg-white'},
+          React.createElement('div',{className:'flex items-center justify-between p-4 border-b',style:{background:dark?'#0f172a':'#f8fafc'}},
+            React.createElement('div',{className:'flex items-center gap-3'},
+              React.createElement('div',{className:'h-10 w-10 rounded-xl flex items-center justify-center text-white font-black',style:{background:BUSINESS.brandColor}},'B'),
+              React.createElement('div',{},
+                React.createElement('div',{className:`font-semibold ${dark?'text-white':'text-gray-900'}`},`${BUSINESS.name} — Assistant`),
+                React.createElement('div',{className:`text-xs ${dark?'text-gray-300':'text-gray-500'}`},'Ask anything. Human handoff available.')
+              )
+            ),
+            React.createElement('div',{className:'flex items-center gap-2'},
+              React.createElement('a',{href:BUSINESS.channels.instagram,target:'_blank',className:'text-xs underline'},'Instagram'),
+              React.createElement('a',{href:BUSINESS.channels.whatsapp,target:'_blank',className:'text-xs underline'},'WhatsApp'),
+              React.createElement('a',{href:BUSINESS.channels.facebook,target:'_blank',className:'text-xs underline'},'Facebook'),
+              React.createElement('button',{onClick:()=>setDark(d=>!d),className:'ml-2 text-xs px-3 py-1 rounded-full border'},dark?'Light':'Dark')
+            )
+          )
+          ,
+          React.createElement('div',{ref:scrollRef,className:`h-[60vh] overflow-y-auto p-4 space-y-4 ${dark?'bg-gray-950':'bg-white'}`},
+            React.createElement(Bubble,{side:'left'},
+              React.createElement('div',{className:'space-y-2'},
+                React.createElement('div',{className:'font-medium'},'Quick actions'),
+                React.createElement(QuickActions,{onPick:onQuickPick})
+              )
+            ),
+            ...messages.map(m=>React.createElement('div',{key:m.id},
+              m.role==='assistant'
+                ? React.createElement(Bubble,{side:'left'}, m.meta?.kind==='lead_capture'
+                    ? React.createElement(LeadCaptureCard,{schema:m.meta.payload,onSubmit:onSubmitLead})
+                    : React.createElement('div',{className:'whitespace-pre-wrap'},String(m.content))
+                  )
+                : React.createElement(Bubble,{side:'right'}, React.createElement('div',{className:'whitespace-pre-wrap'},m.content))
+            )),
+            isTyping && React.createElement('div',{}, React.createElement(Bubble,{side:'left'}, React.createElement('div',{className:'flex items-center gap-3'},React.createElement('span',null,'Typing'), React.createElement(TypingDots))))
+          ),
+          React.createElement('form',{onSubmit:(e)=>{e.preventDefault();send(input);},className:`flex items-center gap-2 p-3 border-t ${dark?'bg-gray-950':'bg-gray-50'}`},
+            React.createElement('input',{
+              id:'dj-input',
+              placeholder:'Type your message…',
+              value: input,
+              onChange:(e)=>setInput(e.target.value),
+              autoComplete:'off',
+              className:`flex-1 rounded-2xl px-4 py-3 border outline-none ${dark?'bg-gray-900 text-white border-gray-800':'bg-white border-gray-200'}`
+            }),
+            React.createElement('button',{type:'submit',className:'px-4 py-3 rounded-2xl text-white font-medium',style:{background:BUSINESS.brandColor}},'Send')
+          )
+        )
+      );
+    }
+
+    // Mounting logic for the floating widget
+    const toggleBtn = document.getElementById('dj-berto-chatbot-toggle');
+    const panel = document.getElementById('dj-berto-chatbot-panel');
+    let isOpen = false;
+
+    const openWidget = ()=>{
+      panel.classList.remove('hidden');
+      if(!panel.__mounted){
+        const root = ReactDOM.createRoot(panel);
+        root.render(React.createElement(Chatbot));
+        panel.__mounted = true;
+      }
+      isOpen = true;
+    };
+    const closeWidget = ()=>{ panel.classList.add('hidden'); isOpen=false; };
+
+    toggleBtn.addEventListener('click', ()=>{ isOpen ? closeWidget() : openWidget(); });
+  </script>
 </body>
 </html>
